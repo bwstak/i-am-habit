@@ -2,11 +2,11 @@
 // (that's also how you fill in a day you forgot).
 
 import { addDays, DOW, fmtRange, fromKey, weekStartKey } from '../dates.js';
-import { dayScore, dayStatus, entryOf, isWeekly, perfectDays, score, targetOf, weekTally, xpBetween } from '../logic.js';
-import { esc, fmtNum, fmtPct, hc, icons } from '../ui.js';
+import { dayScore, dayStatus, entryOf, isTimed, isWeekly, perfectDays, score, targetOf, weekTally, xpBetween } from '../logic.js';
+import { esc, fmtNum, fmtPct, icons } from '../ui.js';
 
 const SAYS = {
-  done: 'done', partial: 'partly done', missed: 'missed', pending: 'not done yet', skipped: 'skipped',
+  done: 'done', partial: 'partly done', late: 'logged late', missed: 'missed', pending: 'not done yet', skipped: 'skipped',
   off: 'not scheduled', open: 'no session', future: 'upcoming', inactive: 'not tracked yet',
 };
 
@@ -25,9 +25,10 @@ export function render(app) {
   <header class="hero hero-plain">
     <div class="hero-nav">
       <button class="icon-btn" data-action="prev" aria-label="Previous week">${icons.left}</button>
-      <div class="hero-title"><p class="hero-kicker">${name}</p><h1>${fmtRange(start, end)}</h1></div>
+      <div class="hero-title"><p class="hero-date">${fmtRange(start, end)}</p></div>
       <button class="icon-btn" data-action="next" aria-label="Next week" ${current ? 'disabled' : ''}>${icons.right}</button>
     </div>
+    <h1 class="hero-word">${name}</h1>
   </header>
   <div class="content">
     <section class="group week-summary">
@@ -45,8 +46,8 @@ export function render(app) {
           <span class="wg-name wg-foot">Day score</span>
           ${days.map((d) => `<span class="wg-score">${d <= today ? pctNumber(dayScore(state, d).pct) : ''}</span>`).join('')}
         </div>
-      </section>
-      ${legend()}`
+        ${legend(habits.some(isTimed))}
+      </section>`
         : '<p class="empty-note">No habits were tracked this week.</p>'
     }
   </div>`;
@@ -64,19 +65,19 @@ function habitRow(state, h, days, today, start) {
   const t = isWeekly(h) ? weekTally(state, h, start) : null;
   const cells = days.map((d) => {
     const s = dayStatus(state, h, d, today);
-    const p = s === 'partial' ? Math.min(1, (entryOf(state, d, h.id)?.value || 0) / targetOf(h)) : 0;
-    return `<button class="cell s-${s}" style="${hc(h)};--p:${p.toFixed(3)}" data-action="open-day" data-date="${d}"
+    const p = s === 'partial' || s === 'late' ? Math.min(1, (entryOf(state, d, h.id)?.value || 0) / targetOf(h)) : 0;
+    return `<button class="cell s-${s}" style="--p:${p.toFixed(3)}" data-action="open-day" data-date="${d}"
       ${d > today ? 'disabled' : ''} aria-label="${esc(h.name)}, ${d}: ${SAYS[s]}"></button>`;
   });
   return `
-    <span class="wg-name" style="${hc(h)}"><span class="wg-emoji">${esc(h.emoji)}</span><span class="wg-label">${esc(h.name)}</span>
+    <span class="wg-name"><span class="wg-emoji">${esc(h.emoji)}</span><span class="wg-label">${esc(h.name)}</span>
       ${t ? `<small class="${t.count >= t.goal ? 'ok' : ''}">${t.count}/${t.goal}</small>` : ''}</span>
     ${cells.join('')}`;
 }
 
-function legend() {
-  const item = (s, label, extra = '') => `<span><i class="cell s-${s}" style="--hc: var(--c-violet)${extra}"></i>${label}</span>`;
-  return `<p class="legend">${item('done', 'Done')}${item('partial', 'Partly', ';--p:.5')}${item('missed', 'Missed')}${item('skipped', 'Skipped')}${item('off', 'Not due')}</p>`;
+function legend(withLate) {
+  const item = (s, label, p = 0) => `<span><i class="cell s-${s}" style="--p:${p}"></i>${label}</span>`;
+  return `<p class="legend">${item('done', 'Done')}${item('partial', 'Partly', 0.5)}${withLate ? item('late', 'Late', 0.5) : ''}${item('missed', 'Missed')}${item('skipped', 'Skipped')}${item('off', 'Not due')}</p>`;
 }
 
 export const actions = {

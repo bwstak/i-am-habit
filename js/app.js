@@ -9,7 +9,7 @@
 
 import { getState, requestPersistence, subscribe } from './store.js';
 import { todayKey } from './dates.js';
-import { toast } from './ui.js';
+import { applyTheme, toast } from './ui.js';
 import * as today from './views/today.js';
 import * as week from './views/week.js';
 import * as stats from './views/stats.js';
@@ -44,6 +44,7 @@ const app = {
 };
 
 function render() {
+  applyTheme(getState().settings.theme);
   const view = views[app.route.name];
   main.innerHTML = view.render(app);
   view.mount?.(main, app);
@@ -53,7 +54,6 @@ function render() {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
-  if (app.route.name !== 'today') document.documentElement.style.removeProperty('--shim');
 }
 
 addEventListener('hashchange', () => {

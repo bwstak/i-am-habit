@@ -4,7 +4,7 @@
 
 import { deleteHabit, makeHabit, saveHabit, setArchived } from '../store.js';
 import { DOW, weekOrder } from '../dates.js';
-import { COLORS, esc, hc, icons, toast } from '../ui.js';
+import { esc, icons, toast } from '../ui.js';
 import { DIFFICULTY } from './habits.js';
 
 const EMOJI = ['⏰', '🌅', '🛏️', '🏋️', '🏃', '🚶', '🍽️', '🥤', '💧', '🥗', '🧽', '🧹', '🧺', '📚', '🧘', '💊', '📵', '✍️'];
@@ -12,6 +12,7 @@ const TYPES = [
   ['check', 'Check', 'Done or not done.'],
   ['count', 'Count', 'Tap once per time you do it, e.g. dishes after 3 meals.'],
   ['amount', 'Amount', 'Log amounts towards a target, e.g. 3,300 kcal.'],
+  ['time', 'Time', 'Tap once to log the time, or set it yourself. By the target time counts as done; late scores less, down to nothing at an hour late.'],
 ];
 const SCHEDULES = [['daily', 'Every day'], ['days', 'Some days'], ['weekly', 'Times a week']];
 
@@ -38,19 +39,17 @@ export function render(app) {
   <header class="hero hero-plain">
     <div class="hero-nav">
       <button class="icon-btn" data-action="back" aria-label="Back">${icons.left}</button>
-      <div class="hero-title"><h1>${existing ? 'Edit habit' : 'New habit'}</h1></div>
-      <span class="icon-btn spacer" aria-hidden="true"></span>
+      <div class="hero-title"></div>
     </div>
+    <h1 class="hero-word">${existing ? 'Edit habit' : 'New habit'}</h1>
   </header>
   <form id="editor" class="content editor" data-type="${h.type}" data-sched="${h.schedule.kind}" data-times="${h.times ? 'on' : 'off'}" novalidate autocomplete="off">
     <section class="group form-card">
-      <div class="name-row" style="${hc(h)}">
+      <div class="name-row">
         <input name="emoji" class="emoji-input" value="${esc(h.emoji)}" maxlength="8" aria-label="Emoji">
         <input name="title" value="${esc(h.name)}" placeholder="Name, e.g. Read 20 pages" aria-label="Name" enterkeyhint="done">
       </div>
       <div class="emoji-picks">${EMOJI.map((e) => `<button type="button" data-action="emoji" data-v="${e}" aria-label="Use ${e}">${e}</button>`).join('')}</div>
-      <input type="hidden" name="color" value="${h.color}">
-      <div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch" style="--hc: var(--c-${c})" data-action="color" data-v="${c}" aria-pressed="${h.color === c}" aria-label="${c}"></button>`).join('')}</div>
     </section>
 
     <section class="group form-card">
@@ -58,7 +57,7 @@ export function render(app) {
       ${seg('type', h.type, TYPES.map(([v, label]) => [v, label]))}
       ${TYPES.map(([v, , hint]) => `<p class="hint only-${v}">${hint}</p>`).join('')}
       <div class="grid2 needs-target">
-        <label class="field"><span class="label">Target per day</span><input name="target" inputmode="decimal" value="${h.type === 'check' ? '' : h.target}" placeholder="3"></label>
+        <label class="field"><span class="label">Target per day</span><input name="target" inputmode="decimal" value="${h.type === 'count' || h.type === 'amount' ? h.target : ''}" placeholder="3"></label>
         <label class="field"><span class="label">Unit</span><input name="unit" value="${esc(h.unit)}" placeholder="meals, kcal, pages"></label>
       </div>
     </section>
@@ -69,7 +68,7 @@ export function render(app) {
       <div class="day-chips only-days">${order.map((d) => `<button type="button" class="chip day-chip" data-action="day" data-v="${d}" aria-pressed="${h.schedule.days.includes(d)}">${DOW[d]}</button>`).join('')}</div>
       <label class="field only-weekly"><span class="label">Sessions per week, on any days</span>
         <select name="perWeek">${[1, 2, 3, 4, 5, 6, 7].map((n) => `<option value="${n}" ${n === h.schedule.perWeek ? 'selected' : ''}>${n}× a week</option>`).join('')}</select></label>
-      <label class="toggle-row"><span><b>Target time</b><small>Shown on the habit, like “by 06:30”. Each day can have its own time.</small></span>
+      <label class="toggle-row"><span><b>Target time</b><small>Shown on the habit, like “by 06:30”. For time habits it’s the deadline. Each day can have its own.</small></span>
         <input type="checkbox" class="switch" name="hasTimes" ${h.times ? 'checked' : ''}></label>
       <div class="times only-times">
         <div class="times-all"><input type="time" name="timeAll" value="${h.times?.[order[0]] || ''}" aria-label="One time for every day">
@@ -122,17 +121,19 @@ export const actions = {
     group.querySelector('input[type=hidden]').value = el.dataset.v;
     group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
     const form = el.closest('form');
-    if (el.dataset.name === 'type') form.dataset.type = el.dataset.v;
     if (el.dataset.name === 'sched') form.dataset.sched = el.dataset.v;
+    if (el.dataset.name === 'type') {
+      form.dataset.type = el.dataset.v;
+      // A time habit needs a deadline to judge "on time", so switch target times on.
+      const times = form.elements.namedItem('hasTimes');
+      if (el.dataset.v === 'time' && !times.checked) {
+        times.checked = true;
+        form.dataset.times = 'on';
+      }
+    }
   },
   emoji(el) {
     el.closest('form').elements.namedItem('emoji').value = el.dataset.v;
-  },
-  color(el) {
-    const form = el.closest('form');
-    form.elements.namedItem('color').value = el.dataset.v;
-    form.querySelectorAll('.swatch').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
-    form.querySelector('.name-row').style.setProperty('--hc', `var(--c-${el.dataset.v})`);
   },
   day(el) {
     el.setAttribute('aria-pressed', String(el.getAttribute('aria-pressed') !== 'true'));
@@ -172,7 +173,7 @@ function save(form, app) {
   if (kind === 'days' && !days.length) return toast('Pick at least one day');
 
   let target = 1;
-  if (type !== 'check') {
+  if (type === 'count' || type === 'amount') {
     target = parseFloat(val('target').replace(',', '.'));
     if (!(target > 0)) return toast('Set a target above 0');
   }
@@ -193,8 +194,7 @@ function save(form, app) {
       target,
       times,
       emoji: val('emoji') || '✅',
-      unit: type === 'check' ? '' : val('unit'),
-      color: val('color'),
+      unit: type === 'count' || type === 'amount' ? val('unit') : '',
       schedule: { kind, days: days.length ? days : existing?.schedule.days, perWeek: Number(val('perWeek')) },
       weight: Number(val('weight')),
       difficulty: Number(val('difficulty')),

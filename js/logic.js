@@ -2,13 +2,15 @@
 // (state, dates) go in, numbers come out. No DOM, no storage, so every rule
 // is easy to read, change and test: see tests/logic.test.js (`npm test`).
 
-import { addDays, eachDay, weekday, weekStartKey } from './dates.js';
+import { addDays, eachDay, toMinutes, weekday, weekStartKey } from './dates.js';
 
 /* ---------- one habit, one day ---------- */
 
 export const isWeekly = (h) => h.schedule.kind === 'weekly';
+export const isTimed = (h) => h.type === 'time';
 
-export const targetOf = (h) => (h.type === 'check' ? 1 : Number(h.target) > 0 ? Number(h.target) : 1);
+/** What counts as 100%: 3 for "3 meals", 3,300 for kcal, and 1 for check and time habits. */
+export const targetOf = (h) => ((h.type === 'count' || h.type === 'amount') && Number(h.target) > 0 ? Number(h.target) : 1);
 
 export const entryOf = (state, key, id) => state.entries[key]?.[id];
 
@@ -39,9 +41,47 @@ export function dayStatus(state, h, key, today) {
   const e = entryOf(state, key, h.id);
   if (e?.skipped) return 'skipped';
   if (isDone(h, e)) return 'done';
+  if (isTimed(h) && e?.time) return 'late'; // logged, but after the target time
   if ((e?.value || 0) > 0) return 'partial';
   if (isWeekly(h)) return 'open'; // a rest day isn't a miss for "4× a week"
   return key === today ? 'pending' : 'missed';
+}
+
+/* ---------- time habits ("up by 06:30") ---------- */
+
+/** Minutes late that score nothing. In between, the score drops evenly: 15 min late = 75%. */
+export const LATE_WINDOW = 60;
+
+/** The target time on that day, like "06:30", or null. Each weekday can have its own. */
+export const goalTime = (h, key) => h.times?.[weekday(key)] || null;
+
+/** Minutes after the target (negative = early). Null when the day has no target. */
+export function minutesLate(h, key, time, dayStartHour = 0) {
+  const goal = goalTime(h, key);
+  return goal ? toMinutes(time, dayStartHour) - toMinutes(goal, dayStartHour) : null;
+}
+
+/** What a logged time is worth: 1 on time (or with no target), then less, down to 0 at LATE_WINDOW. */
+export function timeValue(h, key, time, dayStartHour = 0) {
+  const late = minutesLate(h, key, time, dayStartHour);
+  if (late == null || late <= 0) return 1;
+  return Math.max(0, Math.round((1 - late / LATE_WINDOW) * 100) / 100);
+}
+
+/** Logged times from `from` to `to`: average, earliest and latest (in minutes) and how many were on time. */
+export function timeStats(state, h, from, to) {
+  const dsh = state.settings.dayStartHour;
+  const mins = [];
+  let onTime = 0;
+  for (const key of eachDay(from, to)) {
+    const e = entryOf(state, key, h.id);
+    if (!e?.time || e.skipped) continue;
+    mins.push(toMinutes(e.time, dsh));
+    if (isDone(h, e)) onTime++;
+  }
+  if (!mins.length) return null;
+  const avg = mins.reduce((a, b) => a + b, 0) / mins.length;
+  return { avg, logged: mins.length, onTime, earliest: Math.min(...mins), latest: Math.max(...mins) };
 }
 
 /* ---------- weekly goals ---------- */

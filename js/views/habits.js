@@ -4,9 +4,10 @@ import {
   deleteHabit, exportJSON, isPersisted, moveHabit, parseBackup, replaceAll, resetAll, setArchived, updateSettings,
 } from '../store.js';
 import { DOW, weekOrder } from '../dates.js';
-import { esc, hc, icons, toast } from '../ui.js';
+import { esc, icons, THEMES, toast } from '../ui.js';
 
 export const DIFFICULTY = ['', 'Easy', 'Medium', 'Hard'];
+export const TYPE_NAMES = { check: 'Check', count: 'Count', amount: 'Amount', time: 'Time' };
 
 export function scheduleText(h, weekStart) {
   const s = h.schedule;
@@ -26,17 +27,27 @@ export function render(app) {
   const archived = habits.filter((h) => h.archivedAt);
 
   return `
-  <header class="hero hero-plain"><div class="hero-title left"><h1>Habits and rules</h1></div></header>
+  <header class="hero hero-plain"><h1 class="hero-word">Habits</h1></header>
   <div class="content">
+    <section class="group">
+      <h2>Look</h2>
+      <div class="theme-picks">${THEMES.map((t) => `
+        <button class="theme-pick" data-action="theme" data-v="${t.id}" aria-pressed="${s.theme === t.id}">
+          <span class="tp tp-${t.id}" aria-hidden="true">${t.preview}</span><b>${t.name}</b><small>${t.note}</small>
+        </button>`).join('')}
+      </div>
+    </section>
+
     <section class="group list-card">
+      <h2>Your habits</h2>
       ${active
         .map(
           (h, i) => `
-        <div class="hrow" style="${hc(h)}">
+        <div class="hrow">
           <button class="hrow-main" data-action="edit" data-id="${h.id}">
             <span class="tile sm"><span class="tile-face">${esc(h.emoji)}</span></span>
             <span class="habit-text"><span class="habit-name">${esc(h.name)}</span>
-              <span class="habit-meta"><span>${scheduleText(h, s.weekStart)}</span><span>Importance ×${h.weight}</span><span>${DIFFICULTY[h.difficulty]}</span></span></span>
+              <span class="habit-meta"><span>${scheduleText(h, s.weekStart)}</span><span>${TYPE_NAMES[h.type]}</span><span>×${h.weight}</span><span>${DIFFICULTY[h.difficulty]}</span></span></span>
           </button>
           <span class="hrow-order">
             <button class="icon-btn sm" data-action="up" data-id="${h.id}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${esc(h.name)} up">${icons.up}</button>
@@ -53,7 +64,7 @@ export function render(app) {
         ? `<section class="group list-card"><h2>Archived</h2>
       ${archived
         .map(
-          (h) => `<div class="hrow" style="${hc(h)}">
+          (h) => `<div class="hrow">
         <span class="hrow-main"><span class="tile sm"><span class="tile-face">${esc(h.emoji)}</span></span><span class="habit-name">${esc(h.name)}</span></span>
         <button class="btn small" data-action="restore" data-id="${h.id}">Restore</button>
         <button class="btn small danger" data-action="remove" data-id="${h.id}">Delete</button></div>`,
@@ -119,6 +130,7 @@ export const actions = {
     if (confirm('Delete this habit and all of its history?')) deleteHabit(el.dataset.id);
   },
   'week-start': (el) => updateSettings({ weekStart: Number(el.dataset.v) }),
+  theme: (el) => updateSettings({ theme: el.dataset.v }),
   export: (el, app) => exportBackup(app.today),
   import: (el) => el.parentElement.querySelector('input[type=file]').click(),
   reset() {

@@ -7,6 +7,7 @@
 import { todayKey } from './dates.js';
 import { STARTER_HABITS } from './starter.js';
 
+// Still "dawn-habits" from the app's first name. Renaming it would hide everything you've saved.
 const STORAGE_KEY = 'dawn-habits';
 const SCHEMA = 1;
 
@@ -15,7 +16,10 @@ export const DEFAULT_SETTINGS = {
   dayStartHour: 3, // check-offs before 03:00 count for the previous day
   partialCredit: true, // 2 of 3 dishes = 67% in scores (streaks still need 100%)
   xp: { 1: 10, 2: 20, 3: 35 }, // XP per completion: easy, medium, hard
+  theme: 'bully', // the look: 'bully' or 'ink' (Habits → Look)
 };
+
+const LOOKS = ['bully', 'ink']; // the ids in THEMES (ui.js)
 
 const emptyState = () => ({
   schema: SCHEMA,
@@ -31,15 +35,15 @@ const clamp = (n, lo, hi, fallback) => Math.min(hi, Math.max(lo, Number(n) || fa
 
 /** A complete, valid habit from a partial one. Also used to clean up imported backups. */
 export function makeHabit(p = {}) {
-  const type = ['check', 'count', 'amount'].includes(p.type) ? p.type : 'check';
+  const type = ['check', 'count', 'amount', 'time'].includes(p.type) ? p.type : 'check';
   const s = p.schedule || {};
   return {
     id: p.id || newId(),
     name: String(p.name ?? 'New habit'),
     emoji: p.emoji || '✅',
-    color: p.color || 'amber',
+    color: p.color || 'amber', // from the first design; kept so old backups stay complete
     type,
-    target: type === 'check' ? 1 : Number(p.target) > 0 ? Number(p.target) : 1,
+    target: (type === 'count' || type === 'amount') && Number(p.target) > 0 ? Number(p.target) : 1,
     unit: p.unit || '',
     schedule: {
       kind: ['daily', 'days', 'weekly'].includes(s.kind) ? s.kind : 'daily',
@@ -59,11 +63,13 @@ export function makeHabit(p = {}) {
 // changes one day, bump SCHEMA and convert old data here (if (data.schema < 2) ...).
 function normalize(data) {
   const base = emptyState();
+  const settings = { ...base.settings, ...data.settings, xp: { ...base.settings.xp, ...data.settings?.xp } };
+  if (!LOOKS.includes(settings.theme)) settings.theme = base.settings.theme; // e.g. the retired Gothic look
   return {
     schema: SCHEMA,
     habits: Array.isArray(data.habits) ? data.habits.map(makeHabit) : [],
     entries: data.entries && typeof data.entries === 'object' ? data.entries : {},
-    settings: { ...base.settings, ...data.settings, xp: { ...base.settings.xp, ...data.settings?.xp } },
+    settings,
   };
 }
 

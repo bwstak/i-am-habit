@@ -4,13 +4,15 @@
 // The app notices, downloads the new files in the background and offers "Update".
 // If you add a new file to the app, add it to FILES too.
 
-const VERSION = '1.0.0';
+const VERSION = '1.2.0';
 const CACHE = `dawn-${VERSION}`;
 const FILES = [
   './', './manifest.webmanifest', './css/styles.css',
   './js/app.js', './js/store.js', './js/dates.js', './js/logic.js', './js/ui.js', './js/starter.js',
   './js/views/today.js', './js/views/week.js', './js/views/stats.js', './js/views/habits.js', './js/views/edit.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png',
+  './img/grain.png', './fonts/bodoni-moda-900.woff2', './fonts/bodoni-moda-700.woff2', './fonts/anton-400.woff2',
+  './fonts/space-mono-400.woff2', './fonts/space-mono-700.woff2', './fonts/weekdays-jp.woff2',
 ];
 
 // Two strategies:

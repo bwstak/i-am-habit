@@ -1,4 +1,4 @@
-# Dawn
+# i am habit
 
 A personal habit tracker that works offline, lives on your iPhone home screen and runs on your PC. Plain HTML, CSS and JavaScript modules: no framework, no build step, nothing to install.
 
@@ -37,7 +37,7 @@ Netlify or Vercel work too: connect the repository, or on Netlify drag the folde
 
 ## Install it
 
-**iPhone:** open the address in Safari, tap Share (in the ⋯ menu on newer iOS), then "Add to Home Screen". If you see "Open as Web App", leave it on. From then on, open Dawn from its icon.
+**iPhone:** open the address in Safari, tap Share (in the ⋯ menu on newer iOS), then "Add to Home Screen". If you see "Open as Web App", leave it on. From then on, open the app from its icon.
 
 - The home-screen app has its own storage, separate from Safari. Anything you logged in a Safari tab won't appear in it, so start using the icon straight away.
 - Removing the icon deletes its data. Export a backup first.
@@ -56,7 +56,7 @@ Export now and then anyway: a backup is your only copy outside the device.
 index.html            app shell: tab bar, bottom sheet, toast
 manifest.webmanifest  name, icons and colours for the installed app
 sw.js                 service worker: the offline copy and updates
-css/styles.css        all styling (colours are variables; dark mode swaps them)
+css/styles.css        all styling: one structure, two looks (Bully and Ink)
 js/app.js             starts the app: routing, events, re-rendering
 js/store.js           the data: load, save, change, back up
 js/logic.js           the rules: streaks, scores, XP, comparisons
@@ -65,6 +65,8 @@ js/ui.js              shared helpers: escaping, icons, the sky, toast, sheet
 js/starter.js         your starter habits, as data
 js/views/             one file per screen: today, week, stats, habits, edit
 tests/logic.test.js   tests for the rules
+fonts/                self-hosted fonts, so the app looks right offline (licences inside)
+img/                  the print grain laid over every screen
 icons/                app icons
 ```
 
@@ -87,19 +89,22 @@ Everything is one object, saved as JSON in localStorage under `dawn-habits`. To 
   schema: 1,
   habits: [{
     id, name, emoji, color,
-    type,        // 'check' (done or not), 'count' (one tap per time), 'amount' (towards a target)
-    target,      // 3 for dishes, 3300 for kcal (always 1 for 'check')
+    type,        // 'check' (done or not), 'count' (one tap per time), 'amount' (towards a target),
+                 // 'time' (log when you did it)
+    target,      // 3 for dishes, 3300 for kcal (always 1 for 'check' and 'time')
     unit,        // 'meals', 'kcal'
     schedule,    // { kind: 'daily' | 'days' | 'weekly', days: [1, 3, 5], perWeek: 4 }
-    times,       // target time per weekday: { 1: '06:30', 6: '07:30' }, where 0 = Sunday
+    times,       // target time per weekday: { 1: '06:30', 6: '07:30' }, where 0 = Sunday.
+                 // For 'time' habits this is the deadline.
     weight,      // importance, 1–5
     difficulty,  // 1–3, sets the XP
     startDate, archivedAt, createdAt,
   }],
   entries: {
     '2026-10-24': { [habitId]: { value: 1, skipped: false, updatedAt: 1792851743565 } },
+    // time habits also keep the time: { value: 0.7, time: '07:48', ... }
   },
-  settings: { weekStart, dayStartHour, partialCredit, xp },
+  settings: { weekStart, dayStartHour, partialCredit, xp, theme },
 }
 ```
 
@@ -113,6 +118,7 @@ These all live in `logic.js`, with tests in `tests/logic.test.js`. Change a rule
 - **Streaks** count scheduled days in a row that were done. Unscheduled and skipped days are stepped over, and today never breaks a streak because the day isn't over.
 - **Weekly goals** like Gym 4× count their streak in weeks, and the current week can't break it until it ends. A week you start partway through, or with skipped days, needs a proportional number of sessions.
 - **Scores** are each habit's completion rate, averaged with importance as the weight. Weekly goals are pro-rated: by Wednesday, 4× a week expects 4 × 3/7 ≈ 1.7 sessions, so 2 sessions scores 100%.
+- **Time habits** (Wake up on time) store the time you logged. By the target time counts as done; after it, the score drops evenly to 0 at an hour late (`LATE_WINDOW` in `logic.js`), so 15 minutes late is worth 75%. Times before the day start belong to the night before, so 00:30 is late, not early.
 - **Skipped days** are left out of scores entirely. They're for rest and sick days.
 - **The comparison** on Progress only uses finished days: the start of the week to yesterday, against the same days last week. On the first day of a week it compares the last two full weeks. "% better" is relative: 73% → 82% is +9 points, which is 12% better.
 - **XP** per completion depends on difficulty: 10, 20 or 35 by default, editable in Habits. Level L starts at 50 × L × (L − 1) XP, so levels 2, 3, 4 and 5 start at 100, 300, 600 and 1,000 XP.
@@ -128,14 +134,16 @@ Importance and difficulty are separate on purpose. Importance is how much a habi
 
 Skip step 2 and installed copies keep showing the old version, because they load from the offline copy.
 
+On an iPhone, the home-screen icon and name stay as they were when you added the app. To get a new icon, export a backup, remove the icon, add the app again from Safari and import the backup, because a new icon starts with empty storage.
+
 Stuck on an old version? In Chrome DevTools, open Application → Service workers, click Unregister and reload. Avoid "Clear site data" unless you've exported a backup, because it deletes your habits too.
 
 ## Make it yours
 
 - **Saturday shift:** edit "Wake up on time" in the app and change Saturday's target time. Every day of the week has its own.
 - **Starter habits:** `js/starter.js`, only used when you tap "Load my starter habits" on an empty app.
-- **Habit colours:** the `--c-*` variables at the top of `css/styles.css`, plus their names in `COLORS` in `js/ui.js`.
-- **The sky:** `NIGHT`, `DUSK` and `MORNING` in `js/ui.js`.
+- **The look:** Habits → Look switches between Bully (the default) and Ink. Bully is the base of `css/styles.css` and Ink is a block of variables and overrides at the bottom. Each has its own Today header in `views/today.js` (`heroBully`, `heroInk`).
+- **Fonts:** `fonts/`, loaded at the top of `css/styles.css`. They're served with the app instead of from Google Fonts, so they work offline.
 - **The level curve:** `levelFromXp()` in `js/logic.js`.
 
 ## Things to try, to learn the codebase
@@ -143,25 +151,21 @@ Stuck on an old version? In Chrome DevTools, open Application → Service worker
 Each one touches a different part of the app, roughly from easiest to hardest.
 
 1. Make levels come faster by changing `levelFromXp()`. Run `npm test`, watch the level test fail, then update the test.
-2. Add a ninth habit colour.
+2. Add a third look: copy the Ink block in `css/styles.css`, change its variables, and add it to `THEMES` in `js/ui.js` and `LOOKS` in `js/store.js`.
 3. Show the best streak next to the current one on Today. `streaks()` already returns `best`.
 4. After you check something off, show a toast with an Undo button. `toast()` in `ui.js` already supports an action.
 5. Let a day's entry hold a short note, typed in the habit sheet. Entries keep extra fields, including through backups.
 
 ## Roadmap
 
-### 1. Wake-time logging
+### 1. Sync between phone and PC
 
-Each entry already stores `updatedAt`, the moment you last changed it. For "Wake up on time" that's roughly when you got up, so you could chart it today. A cleaner version saves an explicit `wokeAt: '06:34'` on the entry (editable in the habit sheet, defaulting to now). It then compares that with `habit.times[weekday]` and shows your weekly average, and how many minutes early or late you were, on Progress.
-
-### 2. Sync between phone and PC
-
-Only `store.js` needs to change. Keep localStorage as each device's copy so the app stays offline-first, and sync in the background whenever there's a connection. Entries already carry `updatedAt`, and unchecking stores 0 instead of deleting, so merging can be "newest change wins" for each entry. Habits will need an `updatedAt` too. Mark a deleted habit as deleted instead of removing it, so the deletion reaches your other device. With Supabase, that means:
+Only `store.js` needs to change. Keep localStorage as each device's copy so the app stays offline-first, and sync in the background whenever there's a connection. Entries already carry `updatedAt` (and `time` for time habits), and unchecking stores 0 instead of deleting, so merging can be "newest change wins" for each entry. Habits will need an `updatedAt` too. Mark a deleted habit as deleted instead of removing it, so the deletion reaches your other device. With Supabase, that means:
 
 - a `habits` table and an `entries` table
 - row-level security, so you only ever see your own rows
 - a magic-link sign-in
 
-### 3. Push reminders
+### 2. Push reminders
 
 On iPhone, push works only for home-screen apps (iOS 16.4 or later), and the permission prompt has to come from a tap. Something also has to send each reminder at the right time, so this needs a small server. Each device's push subscription goes into the sync database, and a scheduled function sends reminders based on `habit.times`. That's why it comes after sync. The service worker receives the `push` event and shows the notification.

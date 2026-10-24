@@ -3,9 +3,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addDays, diffDays, todayKey, weekStartKey } from '../js/dates.js';
+import { addDays, diffDays, fmtTime, todayKey, toMinutes, weekStartKey } from '../js/dates.js';
 import {
-  change, comparisonSpans, dayScore, dayStatus, levelFromXp, score, streaks, weekTally, xpBetween,
+  change, comparisonSpans, dayScore, dayStatus, levelFromXp, minutesLate, score, streaks, timeStats, timeValue,
+  weekTally, xpBetween,
 } from '../js/logic.js';
 
 const settings = { weekStart: 1, dayStartHour: 3, partialCredit: true, xp: { 1: 10, 2: 20, 3: 35 } };
@@ -126,4 +127,35 @@ test('change reports points and relative %', () => {
   assert.deepEqual(change(0.82, 0.73), { pts: 9, rel: 9 / 73 });
   assert.equal(change(0.5, 0).rel, null);
   assert.equal(change(null, 0.5), null);
+});
+
+test('time habits: on time is done, late scores less, an hour late scores 0', () => {
+  const h = habit({ type: 'time', times: { 1: '06:30', 6: '07:30' } }); // Monday and Saturday targets
+  assert.equal(timeValue(h, '2026-10-24', '07:25', 3), 1); // Saturday, 5 min early
+  assert.equal(timeValue(h, '2026-10-24', '07:30', 3), 1);
+  assert.equal(timeValue(h, '2026-10-24', '07:45', 3), 0.75);
+  assert.equal(timeValue(h, '2026-10-24', '08:45', 3), 0);
+  assert.equal(minutesLate(h, '2026-10-19', '06:20', 3), -10); // Monday
+  assert.equal(timeValue(h, '2026-10-21', '09:00', 3), 1); // no target on Wednesday: any time counts
+});
+
+test('times after midnight count as late, not early', () => {
+  assert.equal(toMinutes('00:30', 3), 1470);
+  assert.equal(fmtTime(1470), '00:30');
+  const bed = habit({ type: 'time', times: { 6: '23:00' } });
+  assert.equal(minutesLate(bed, '2026-10-24', '00:30', 3), 90);
+});
+
+test('a late wake-up shows as late, breaks the streak and counts in the averages', () => {
+  const h = habit({ type: 'time', times: { 0: '07:30', 1: '06:30', 2: '06:30', 3: '06:30', 4: '06:30', 5: '06:30', 6: '07:30' } });
+  const entries = {
+    '2026-10-21': { h: { value: 1, time: '06:20', skipped: false } },
+    '2026-10-22': { h: { value: 0.5, time: '07:00', skipped: false } },
+    '2026-10-23': { h: { value: 1, time: '06:29', skipped: false } },
+  };
+  const s = { habits: [h], settings, entries };
+  assert.equal(dayStatus(s, h, '2026-10-22', '2026-10-24'), 'late');
+  assert.equal(streaks(s, h, '2026-10-24').current, 1);
+  const t = timeStats(s, h, '2026-10-21', '2026-10-23');
+  assert.deepEqual([t.logged, t.onTime, fmtTime(t.avg)], [3, 2, '06:36']);
 });

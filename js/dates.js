@@ -66,3 +66,26 @@ export function relativeDay(key, today) {
   if (n === 1) return 'Yesterday';
   return n > 1 ? `${n} days ago` : 'Upcoming';
 }
+
+/* ---------- times of day ("06:34") ---------- */
+
+/**
+ * "06:34" → minutes after midnight (394). Times before the day start belong to the night
+ * before, so they count as very late, not early: with a 03:00 day start, "00:30" → 1470.
+ */
+export function toMinutes(time, dayStartHour = 0) {
+  const [h, m] = String(time).split(':').map(Number);
+  const v = h * 60 + m;
+  return v < dayStartHour * 60 ? v + 1440 : v;
+}
+
+/** Minutes → "06:34". Wraps past midnight: 1470 → "00:30". */
+export function fmtTime(min) {
+  const v = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${pad(Math.floor(v / 60))}:${pad(v % 60)}`;
+}
+
+/** The time right now, as "06:34". */
+export const nowTime = (now = new Date()) => `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+export const fmtWeekday = (key) => fmt(key, { weekday: 'long' });
