@@ -1,0 +1,11 @@
+{
+  "name": "dawn-habits",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline-first habit tracker PWA. No build step.",
+  "scripts": {
+    "start": "npx --yes http-server -p 5173 -c-1 .",
+    "test": "node --test"
+  }
+}
